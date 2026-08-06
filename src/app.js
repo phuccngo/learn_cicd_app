@@ -1,0 +1,30 @@
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const apiRoutes = require('./routes/api');
+const healthRoutes = require('./routes/health');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+
+// Routes
+app.use('/api', apiRoutes);
+app.use('/health', healthRoutes);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+console.error(err.stack);
+res.status(500).json({ error: 'Something went wrong!' });
+});
+
+// Start server
+app.listen(PORT, () => {
+console.log(`Server running on port ${PORT}`);
+});
+
+module.exports = app;
