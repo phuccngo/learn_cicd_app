@@ -57,9 +57,18 @@ jobs:
       - name: Test Docker image
         run: |
           docker run --rm -d -p 3000:3000 --name test-container ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          sleep 10
-          curl -f http://localhost:3000/health
-          docker stop test-container
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/health; then
+              echo "Health check passed"
+              docker stop test-container
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Health check failed, container logs:"
+          docker logs test-container || true
+          docker stop test-container || true
+          exit 1
 
   # Deploy to Staging
   deploy-staging:

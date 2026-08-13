@@ -5,7 +5,6 @@ const apiRoutes = require('./routes/api');
 const healthRoutes = require('./routes/health');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(helmet());
@@ -21,12 +20,5 @@ app.use((err, req, res, next) => {
 console.error(err.stack);
 res.status(500).json({ error: 'Something went wrong!' });
 });
-
-// Start server
-if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-}
 
 module.exports = app;
