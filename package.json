@@ -4,7 +4,7 @@
     "description": "Sample application for CI/CD tutorial",
     "main": "src/app.js",
     "scripts": {
-        "start": "node src/app.js",
+        "start": "node src/server.js",
         "test": "jest",
         "test:unit": "jest --testPathPattern=unit",
         "test:integration": "jest --testPathPattern=integration",
