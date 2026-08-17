@@ -5,17 +5,27 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '0 3 * * 0'   # Chạy dọn dẹp image cũ mỗi Chủ nhật lúc 3h sáng UTC
 
 env:
   NODE_VERSION: '18'
   DOCKER_REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# Cần quyền write để push image và xóa version cũ trên GHCR
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  # Build and Test Stage
+  # ---------------------------------------------------------
+  # Build, Test và Push image lên Registry (chỉ 1 lần duy nhất)
+  # ---------------------------------------------------------
   build-and-test:
     runs-on: ubuntu-latest
-
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -49,36 +59,20 @@ jobs:
       - name: Security audit
         run: npm audit --audit-level moderate
 
+      - name: Set image tag
+        id: meta
+        run: echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
       - name: Build Docker image
         run: |
           docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
-          docker build -t ${{ env.IMAGE_NAME }}:latest .
 
       - name: Test Docker image
         run: |
           docker run --rm -d -p 3000:3000 --name test-container ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          for i in $(seq 1 30); do
-            if curl -fsS http://localhost:3000/health; then
-              echo "Health check passed"
-              docker stop test-container
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Health check failed, container logs:"
-          docker logs test-container || true
-          docker stop test-container || true
-          exit 1
-
-  # Deploy to Staging
-  deploy-staging:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+          sleep 10
+          curl -f http://localhost:3000/health
+          docker stop test-container
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
@@ -87,28 +81,49 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push Docker image
+      - name: Tag and push image (sha)
         run: |
           docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:staging
           docker push ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  # ---------------------------------------------------------
+  # Deploy Staging — pull image từ registry, không build lại
+  # ---------------------------------------------------------
+  deploy-staging:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image from registry
+        run: docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }}
+
+      - name: Tag and push staging alias
+        run: |
+          docker tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }} ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:staging
           docker push ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:staging
 
       - name: Deploy to staging
         run: |
           echo "Deploying to staging environment..."
+          # Ví dụ: kubectl set image deployment/app app=${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }}
+          # Ví dụ: docker-compose -f docker-compose.staging.yml up -d
 
-  # Deploy to Production
+  # ---------------------------------------------------------
+  # Deploy Production — pull image từ registry, không build lại
+  # ---------------------------------------------------------
   deploy-production:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     environment: production
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
@@ -116,17 +131,37 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push Docker image
+      - name: Pull image from registry
+        run: docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }}
+
+      - name: Tag and push latest alias
         run: |
-          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          docker push ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }} ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           docker push ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Deploy to production
         run: |
           echo "Deploying to production environment..."
+          # Ví dụ: kubectl set image deployment/app app=${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }}
+          # Ví dụ: docker-compose -f docker-compose.prod.yml up -d
 
       - name: Health check
         run: |
           echo "Performing post-deployment health check..."
+          # Ví dụ: curl -f https://your-app.com/health
+
+  # ---------------------------------------------------------
+  # Dọn dẹp image cũ trên GHCR (chạy định kỳ hàng tuần)
+  # Không phụ thuộc vào push/PR, dùng workflow riêng bằng schedule
+  # ---------------------------------------------------------
+  cleanup-old-images:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Delete old untagged/old versions
+        uses: actions/delete-package-versions@v4
+        with:
+          package-name: ${{ github.event.repository.name }}
+          package-type: container
+          min-versions-to-keep: 10
+          delete-only-untagged-versions: false
