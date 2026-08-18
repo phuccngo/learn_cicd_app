@@ -7,6 +7,20 @@ on:
     branches: [ main ]
   schedule:
     - cron: '0 3 * * 0'   # Chạy dọn dẹp image cũ mỗi Chủ nhật lúc 3h sáng UTC
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to deploy'
+        required: false
+        type: string
 
 env:
   NODE_VERSION: '18'
@@ -138,6 +152,11 @@ jobs:
         run: |
           docker tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }} ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           docker push ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Show deployment configuration
+        run: |
+          echo "Đang tiến hành triển khai lên môi trường: ${{ github.event.inputs.environment }}"
+          echo "Phiên bản được chọn để deploy là: ${{ github.event.inputs.version }}"
 
       - name: Deploy to production
         run: |
