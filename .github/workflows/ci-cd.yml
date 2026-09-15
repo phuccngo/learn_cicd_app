@@ -105,6 +105,7 @@ jobs:
   # ---------------------------------------------------------
   lint:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -123,6 +124,7 @@ jobs:
 
   unit-test:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -141,6 +143,7 @@ jobs:
 
   integration-test:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -183,6 +186,7 @@ jobs:
 
   security-audit:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -201,7 +205,10 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     needs: [lint, unit-test, integration-test, coverage-report, security-audit]
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -258,17 +265,17 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull image from registry
-        run: docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }}
+        run: docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }}
 
       - name: Tag and push staging alias
         run: |
-          docker tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }} ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:staging
+          docker tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }} ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:staging
           docker push ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:staging
 
       - name: Deploy to staging
         run: |
           echo "Deploying to staging environment..."
-          # Ví dụ: kubectl set image deployment/app app=${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }}
+          # Ví dụ: kubectl set image deployment/app app=${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }}
           # Ví dụ: docker-compose -f docker-compose.staging.yml up -d
 
   # ---------------------------------------------------------
@@ -288,11 +295,11 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull image from registry
-        run: docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }}
+        run: docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }}
 
       - name: Tag and push latest alias
         run: |
-          docker tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }} ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }} ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           docker push ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Show deployment configuration
@@ -303,7 +310,7 @@ jobs:
       - name: Deploy to production
         run: |
           echo "Deploying to production environment..."
-          # Ví dụ: kubectl set image deployment/app app=${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-test.outputs.image-tag }}
+          # Ví dụ: kubectl set image deployment/app app=${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }}
           # Ví dụ: docker-compose -f docker-compose.prod.yml up -d
 
       - name: Health check
