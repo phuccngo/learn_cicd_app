@@ -9,18 +9,19 @@ on:
     - cron: '0 3 * * 0'   # Chạy dọn dẹp image cũ mỗi Chủ nhật lúc 3h sáng UTC
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Environment to deploy to'
+      os:
+        description: 'OS to deploy to'
         required: true
-        default: 'staging'
+        default: 'ubuntu'
         type: choice
         options:
-          - staging
-          - production
-      version:
-        description: 'Version to deploy'
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+      node-version:
         required: false
         type: string
+        description: 'Node.js version to use for deployment'
 
 env:
   NODE_VERSION: '18'
@@ -103,12 +104,25 @@ jobs:
   # ---------------------------------------------------------
   # Thay vì dùng job build-and-test ta sẽ dùng những job này để có thể sử dụng parallel pattern
   # ---------------------------------------------------------
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set matrix
+        id: set-matrix
+        run: |
+          matrix="{\"os\": [\"ubuntu-latest\"], \"node-version\": [\"16\", \"17\", \"18\"], \"include\": [{\"os\": \"ubuntu-slim\", \"node-version\": \"10\"}], \"exclude\": [{\"os\": \"ubuntu-latest\", \"node-version\": \"16\"}]}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            matrix="{\"os\": [inputs.os], \"node-version\": [inputs.node-version]}"
+          fi
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+
   lint:
+    needs: generate-matrix
     runs-on: ${{matrix.os}}
     strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [16, 17, 18]
+      matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
     if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
@@ -137,11 +151,10 @@ jobs:
         run: npm run lint
 
   unit-test:
+    needs: generate-matrix
     runs-on: ${{matrix.os}}
     strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [16, 17, 18]
+      matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
     if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
@@ -170,11 +183,10 @@ jobs:
         run: npm run test:unit
 
   integration-test:
+    needs: generate-matrix
     runs-on: ${{matrix.os}}
     strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [16, 17, 18]
+      matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
     if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
@@ -205,10 +217,8 @@ jobs:
   coverage-report:
     runs-on: ${{matrix.os}}
     strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [16, 17, 18]
-    needs: [unit-test, integration-test]
+      matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
+    needs: [unit-test, integration-test, generate-matrix]
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -241,11 +251,10 @@ jobs:
           file: ./coverage/lcov.info
 
   security-audit:
+    needs: generate-matrix
     runs-on: ${{matrix.os}}
     strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [16, 17, 18]
+      matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
     if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
@@ -276,11 +285,9 @@ jobs:
   build:
     runs-on: ${{matrix.os}}
     strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [16, 17, 18]
+      matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
     if: github.event_name != 'schedule'
-    needs: [lint, unit-test, integration-test, coverage-report, security-audit]
+    needs: [lint, unit-test, integration-test, coverage-report, security-audit, generate-matrix]
     outputs:
       image-tag: ${{ steps.meta.outputs.tag }}
     steps:
@@ -337,12 +344,10 @@ jobs:
   # Deploy Staging — pull image từ registry, không build lại
   # ---------------------------------------------------------
   deploy-staging:
-    needs: build
+    needs: [build, generate-matrix]
     runs-on: ${{matrix.os}}
     strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [16, 17, 18]
+      matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
     if: github.ref == 'refs/heads/develop'
     steps:
       - name: Login to GitHub Container Registry
@@ -370,12 +375,10 @@ jobs:
   # Deploy Production — pull image từ registry, không build lại
   # ---------------------------------------------------------
   deploy-production:
-    needs: build
+    needs: [build, generate-matrix]
     runs-on: ${{matrix.os}}
     strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [16, 17, 18]
+      matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
     if: github.ref == 'refs/heads/main'
     environment: production
     steps:
@@ -415,10 +418,7 @@ jobs:
   # Không phụ thuộc vào push/PR, dùng workflow riêng bằng schedule
   # ---------------------------------------------------------
   cleanup-old-images:
-    runs-on: ${{matrix.os}}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
     steps:
       - name: Delete old untagged/old versions
