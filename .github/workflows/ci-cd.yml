@@ -47,7 +47,7 @@ jobs:
   #     - name: Setup Node.js
   #       uses: actions/setup-node@v3
   #       with:
-  #         node-version: ${{ env.NODE_VERSION }}
+  #         node-version: ${{ matrix.node-version }}
   #         cache: 'npm'
 
   #     - name: Install dependencies
@@ -104,7 +104,11 @@ jobs:
   # Thay vì dùng job build-and-test ta sẽ dùng những job này để có thể sử dụng parallel pattern
   # ---------------------------------------------------------
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 17, 18]
     if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
@@ -113,7 +117,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ matrix.node-version }}
           # cache: 'npm'
 
       - name: Cache dependencies
@@ -133,7 +137,11 @@ jobs:
         run: npm run lint
 
   unit-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 17, 18]
     if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
@@ -142,7 +150,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ matrix.node-version }}
           # cache: 'npm'
 
       - name: Cache dependencies
@@ -162,7 +170,11 @@ jobs:
         run: npm run test:unit
 
   integration-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 17, 18]
     if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
@@ -171,7 +183,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ matrix.node-version }}
           # cache: 'npm'
 
       - name: Cache dependencies
@@ -191,7 +203,11 @@ jobs:
         run: npm run test:integration
 
   coverage-report:
-    runs-on: ubuntu-latest
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 17, 18]
     needs: [unit-test, integration-test]
     steps:
       - name: Checkout code
@@ -200,7 +216,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ matrix.node-version }}
           # cache: 'npm'
 
       - name: Cache dependencies
@@ -225,7 +241,11 @@ jobs:
           file: ./coverage/lcov.info
 
   security-audit:
-    runs-on: ubuntu-latest
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 17, 18]
     if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
@@ -234,7 +254,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ matrix.node-version }}
           # cache: 'npm'
 
       - name: Cache dependencies
@@ -254,7 +274,11 @@ jobs:
         run: npm audit --audit-level moderate
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 17, 18]
     if: github.event_name != 'schedule'
     needs: [lint, unit-test, integration-test, coverage-report, security-audit]
     outputs:
@@ -266,7 +290,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ matrix.node-version }}
           # cache: 'npm'
 
       - name: Cache dependencies
@@ -314,7 +338,11 @@ jobs:
   # ---------------------------------------------------------
   deploy-staging:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 17, 18]
     if: github.ref == 'refs/heads/develop'
     steps:
       - name: Login to GitHub Container Registry
@@ -343,7 +371,11 @@ jobs:
   # ---------------------------------------------------------
   deploy-production:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 17, 18]
     if: github.ref == 'refs/heads/main'
     environment: production
     steps:
@@ -383,7 +415,10 @@ jobs:
   # Không phụ thuộc vào push/PR, dùng workflow riêng bằng schedule
   # ---------------------------------------------------------
   cleanup-old-images:
-    runs-on: ubuntu-latest
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     if: github.event_name == 'schedule'
     steps:
       - name: Delete old untagged/old versions
