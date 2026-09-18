@@ -112,7 +112,7 @@
         - name: Set matrix
           id: set-matrix
           run: |
-            matrix="{\"os\": [\"ubuntu-latest\"], \"node-version\": [\"16\", \"17\", \"18\"], \"include\": [{\"os\": \"ubuntu-slim\", \"node-version\": \"16\"}], \"exclude\": [{\"os\": \"ubuntu-latest\", \"node-version\": \"16\"}]}"
+            matrix="{\"os\": [\"ubuntu-latest\"], \"node-version\": [\"16\", \"17\", \"18\"], \"include\": [{\"os\": \"ubuntu-22.04\", \"node-version\": \"16\"}], \"exclude\": [{\"os\": \"ubuntu-latest\", \"node-version\": \"16\"}]}"
             if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
               matrix="{\"os\": [inputs.os], \"node-version\": [inputs.node-version]}"
             fi
