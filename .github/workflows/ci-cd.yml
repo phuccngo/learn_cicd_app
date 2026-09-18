@@ -112,7 +112,7 @@
         - name: Set matrix
           id: set-matrix
           run: |
-            matrix="{\"os\": [\"ubuntu-latest\"], \"node-version\": [\"16\", \"17\", \"18\"], \"include\": [{\"os\": \"ubuntu-slim\", \"node-version\": \"15\"}], \"exclude\": [{\"os\": \"ubuntu-latest\", \"node-version\": \"16\"}]}"
+            matrix="{\"os\": [\"ubuntu-latest\"], \"node-version\": [\"16\", \"17\", \"18\"], \"include\": [{\"os\": \"ubuntu-slim\", \"node-version\": \"16\"}], \"exclude\": [{\"os\": \"ubuntu-latest\", \"node-version\": \"16\"}]}"
             if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
               matrix="{\"os\": [inputs.os], \"node-version\": [inputs.node-version]}"
             fi
@@ -399,8 +399,7 @@
 
         - name: Show deployment configuration
           run: |
-            echo "Đang tiến hành triển khai lên môi trường: ${{ github.event.inputs.environment }}"
-            echo "Phiên bản được chọn để deploy là: ${{ github.event.inputs.version }}"
+            echo "Đang tiến hành triển khai lên môi trường production"
 
         - name: Deploy to production
           run: |
