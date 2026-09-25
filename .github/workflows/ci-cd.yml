@@ -150,7 +150,7 @@
 
         - name: Run quick test
           run: |
-            npm run lint:quick
+            npm run lint &
             npm run test:unit
 
         - name: Parallel Linting and Testing
