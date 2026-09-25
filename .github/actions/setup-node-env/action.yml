@@ -1,0 +1,42 @@
+name: setup Node environment
+description: Setup Node.js environment for GitHub Actions
+
+inputs:
+  node-version:
+    description: 'Node.js version to use'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: inputs.node-version
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.npm
+          node_modules
+        key: ${{ runner.os }}-dep-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-dep-
+
+    - name: Cache build artifacts
+      uses: actions/cache@v3
+      with:
+        path: |
+          dist/
+          build/
+        key: ${{ runner.os }}-build-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-build-
+
+    - name: Install dependencies
+      run: npm ci
+      shell: bash

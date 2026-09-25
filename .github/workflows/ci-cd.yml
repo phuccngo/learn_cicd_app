@@ -118,7 +118,7 @@
             fi
             echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
-    test:
+    lint:
       needs: generate-matrix
       runs-on: ${{matrix.os}}
       strategy:
@@ -126,27 +126,10 @@
         matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
       if: github.event_name != 'schedule'
       steps:
-        - name: Checkout code
-          uses: actions/checkout@v3
-
         - name: Setup Node.js
-          uses: actions/setup-node@v3
+          uses: ./.github/actions/setup-node-env
           with:
             node-version: ${{ matrix.node-version }}
-            # cache: 'npm'
-
-        - name: Cache dependencies
-          uses: actions/cache@v3
-          with:
-            path: |
-              ~/.npm
-              node_modules
-            key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-            restore-keys: |
-              ${{ runner.os }}-node-
-
-        - name: Install dependencies
-          run: npm ci
 
         - name: Run quick test
           run: |
@@ -155,41 +138,63 @@
 
         - name: Parallel Linting and Testing
           if: github.ref == 'refs/heads/main'
-          shell: bash
+          run: npm run lint
+
+    unit-test:
+      needs: generate-matrix
+      runs-on: ${{matrix.os}}
+      strategy:
+        max-parallel: 2
+        matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
+      if: github.event_name != 'schedule'
+      steps:
+        - name: Setup Node.js
+          uses: ./.github/actions/setup-node-env
+          with:
+            node-version: ${{ matrix.node-version }}
+
+        - name: Run quick test
           run: |
             npm run lint &
-            npm run test:unit &
-            npm run test:integration &
-            wait
+            npm run test:unit
+
+        - name: Parallel Linting and Testing
+          if: github.ref == 'refs/heads/main'
+          run: npm run test:unit
+
+    integration-test:
+      needs: generate-matrix
+      runs-on: ${{matrix.os}}
+      strategy:
+        max-parallel: 2
+        matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
+      if: github.event_name != 'schedule'
+      steps:
+        - name: Setup Node.js
+          uses: ./.github/actions/setup-node-env
+          with:
+            node-version: ${{ matrix.node-version }}
+
+        - name: Run quick test
+          run: |
+            npm run lint &
+            npm run test:unit
+
+        - name: Parallel Linting and Testing
+          if: github.ref == 'refs/heads/main'
+          run: npm run test:integration
 
     coverage-report:
       runs-on: ${{matrix.os}}
       strategy:
         max-parallel: 2
         matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
-      needs: [test, generate-matrix]
+      needs: [lint, unit-test, integration-test, generate-matrix]
       steps:
-        - name: Checkout code
-          uses: actions/checkout@v3
-
         - name: Setup Node.js
-          uses: actions/setup-node@v3
+          uses: ./.github/actions/setup-node-env
           with:
             node-version: ${{ matrix.node-version }}
-            # cache: 'npm'
-
-        - name: Cache dependencies
-          uses: actions/cache@v3
-          with:
-            path: |
-              ~/.npm
-              node_modules
-            key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-            restore-keys: |
-              ${{ runner.os }}-node-
-
-        - name: Install dependencies
-          run: npm ci
 
         - name: Generate coverage report
           run: npm run test -- --coverage
@@ -207,27 +212,10 @@
         matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
       if: github.event_name != 'schedule'
       steps:
-        - name: Checkout code
-          uses: actions/checkout@v3
-
         - name: Setup Node.js
-          uses: actions/setup-node@v3
+          uses: ./.github/actions/setup-node-env
           with:
             node-version: ${{ matrix.node-version }}
-            # cache: 'npm'
-
-        - name: Cache dependencies
-          uses: actions/cache@v3
-          with:
-            path: |
-              ~/.npm
-              node_modules
-            key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-            restore-keys: |
-              ${{ runner.os }}-node-
-
-        - name: Install dependencies
-          run: npm ci
 
         - name: Security audit
           run: npm audit --audit-level moderate
@@ -238,31 +226,14 @@
         max-parallel: 2
         matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
       if: github.event_name != 'schedule'
-      needs: [test, coverage-report, security-audit, generate-matrix]
+      needs: [lint, unit-test, integration-test, coverage-report, security-audit, generate-matrix]
       outputs:
         image-tag: ${{ steps.meta.outputs.tag }}
       steps:
-        - name: Checkout code
-          uses: actions/checkout@v3
-
         - name: Setup Node.js
-          uses: actions/setup-node@v3
+          uses: ./.github/actions/setup-node-env
           with:
             node-version: ${{ matrix.node-version }}
-            # cache: 'npm'
-
-        - name: Cache dependencies
-          uses: actions/cache@v3
-          with:
-            path: |
-              ~/.npm
-              node_modules
-            key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-            restore-keys: |
-              ${{ runner.os }}-node-
-
-        - name: Install dependencies
-          run: npm ci
 
         - name: Set image tag
           id: meta
