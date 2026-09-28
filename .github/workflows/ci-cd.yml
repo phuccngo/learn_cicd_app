@@ -126,6 +126,9 @@
         matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
       if: github.event_name != 'schedule'
       steps:
+        - name: Checkout code
+          uses: actions/checkout@v3
+          
         - name: Setup Node.js
           uses: ./.github/actions/setup-node-env
           with:
@@ -148,6 +151,9 @@
         matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
       if: github.event_name != 'schedule'
       steps:
+        - name: Checkout code
+          uses: actions/checkout@v3
+
         - name: Setup Node.js
           uses: ./.github/actions/setup-node-env
           with:
@@ -170,6 +176,9 @@
         matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
       if: github.event_name != 'schedule'
       steps:
+        - name: Checkout code
+          uses: actions/checkout@v3
+
         - name: Setup Node.js
           uses: ./.github/actions/setup-node-env
           with:
@@ -191,6 +200,9 @@
         matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
       needs: [lint, unit-test, integration-test, generate-matrix]
       steps:
+        - name: Checkout code
+          uses: actions/checkout@v3
+
         - name: Setup Node.js
           uses: ./.github/actions/setup-node-env
           with:
@@ -212,6 +224,9 @@
         matrix: ${{fromJSON(needs.generate-matrix.outputs.matrix)}}
       if: github.event_name != 'schedule'
       steps:
+        - name: Checkout code
+          uses: actions/checkout@v3
+
         - name: Setup Node.js
           uses: ./.github/actions/setup-node-env
           with:
@@ -230,6 +245,9 @@
       outputs:
         image-tag: ${{ steps.meta.outputs.tag }}
       steps:
+        - name: Checkout code
+          uses: actions/checkout@v3
+
         - name: Setup Node.js
           uses: ./.github/actions/setup-node-env
           with:
